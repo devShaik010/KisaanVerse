@@ -1,107 +1,122 @@
-# KisaanVerse 🌾
+# KisaanVerse - Developer Setup Guide
 
-> Enhancing Farmer Productivity through Innovative Technology Solutions
+FastAPI backend for agricultural platform with AI-powered features.
 
-KisaanVerse is a comprehensive mobile application designed to empower farmers with AI-driven insights, real-time weather monitoring, crop recommendations, and government scheme information in their regional language.
+## Project Setup
 
-## Features
+### 1. Clone Repository
+```powershell
+git clone https://github.com/devShaik010/KisaanVerse.git
+cd KisaanVerse
+```
 
-- **Crop Recommendation System** - Get personalized crop suggestions based on location, soil, and season
-- **Crop Yield Prediction** - Predict crop yields with ML-powered analytics and receive timely alerts
-- **Weather Monitoring** - Real-time weather status with temperature, humidity, and precipitation data
-- **Government Schemes Dashboard** - Stay updated with relevant agricultural schemes and subsidies
-- **Multilingual Voice & Chat Assistant** - AI-powered assistant with regional language support
+### 2. Create Virtual Environment
+```powershell
+python -m venv env
+```
+
+### 3. Activate Environment
+```powershell
+.\env\Scripts\Activate.ps1
+```
+
+### 4. Install Dependencies
+```powershell
+pip install -r requirements.txt
+```
+
+### 5. Run Application
+```powershell
+python main.py
+```
+
+Access API Documentation: **http://localhost:8000/docs**
+
+## Project Structure
+
+```
+KisaanVerse/
+├── app/
+│   ├── __init__.py
+│   ├── config.py       # Configuration & API keys
+│   ├── models.py       # Pydantic request/response models
+│   ├── routes.py       # API endpoints
+│   ├── services.py     # Business logic (add your implementations here)
+│   └── models/
+│       └── croppredict.pkl  # ML model files
+├── main.py             # FastAPI application entry point
+├── requirements.txt    # Python dependencies
+└── README.md
+```
+
+## How to Work
+
+### Adding New Features
+
+1. **Define Models** (`app/models.py`)
+   - Add Pydantic models for request/response
+
+2. **Implement Logic** (`app/services.py`)
+   - Write your business logic functions
+   - Integrate ML models, APIs, databases
+
+3. **Create Endpoints** (`app/routes.py`)
+   - Connect routes to services
+   - Handle requests and responses
+
+4. **Configure Settings** (`app/config.py`)
+   - Add API keys
+   - Set environment variables
+
+### Available Endpoints
+
+| Method | Endpoint | Purpose | Status |
+|--------|----------|---------|--------|
+| GET | `/KV/weather` | Get weather data by location/coordinates | ✅ Working |
+| POST | `/kv/predictCrop` | Crop recommendation system | ⚠️ TODO |
+| POST | `/kv/yieldPredict` | Crop yield prediction | ⚠️ TODO |
+| GET | `/kv/govSchemes` | Government schemes list | ⚠️ TODO |
+| POST | `/kv/kvLLM` | AI assistant | ⚠️ TODO |
+| POST | `/kv/BotLLM` | RAG-powered voice bot | ⚠️ TODO |
+
+### Testing Endpoints
+
+1. **Using Swagger UI**
+   - Open: http://localhost:8000/docs
+   - Click on endpoint → "Try it out" → Fill parameters → Execute
+
+2. **Using cURL**
+   ```powershell
+   # Weather by location
+   curl "http://localhost:8000/KV/weather?location=Bangalore"
+   
+   # Weather by coordinates
+   curl "http://localhost:8000/KV/weather?lat=12.9716&lon=77.5946"
+   ```
 
 ## Tech Stack
 
-### Backend
-- FastAPI / Flask
-- GenAI & ML Models
-- Langchain & RAG System
-- ChromaDB & FaissIndex
-- Crawl4AI for web scraping
-- Docker & Cloud deployment
+- **Backend**: FastAPI, Pydantic, Uvicorn
+- **HTTP Client**: httpx (for external APIs)
+- **Weather**: Open-Meteo (free, no API key required)
+- **Geocoding**: Nominatim (free, no API key required)
 
-### Mobile App
-- Flutter (Dart/Java)
-- REST API Integration
-- Android SDK
-- Real-time notifications
+## Development Tips
 
-### UI/UX
-- Figma & Canva
-- Pinterest-inspired designs
-- Excalidraw
+- Hot reload is enabled - code changes auto-restart server
+- Check `/health` endpoint to verify server is running
+- All endpoints return JSON responses
+- Use Swagger UI for interactive API testing
 
-## API Endpoints
+## Next Steps
 
-### Weather Status
-```
-GET /KV/weather
-Response: { temperature, humidity, precipitation }
-```
-
-### Crop Recommendation
-```
-POST /kv/predictCrop
-Request: { state, crop, area, fertilizer, pesticide, season }
-Response: { recommended_crops, selected_crop_status, ai_summary }
-```
-
-### Yield Prediction
-```
-POST /kv/yieldPredict
-Request: { state, district, year, crop, season, soil_data, weather_data }
-Response: { yield_kg_ha, predictions }
-```
-
-### Government Schemes
-```
-GET /kv/govSchemes
-Response: { schemes_list }
-```
-
-### AI Assistant
-```
-POST /kv/kvLLM
-POST /kv/BotLLM
-Features: Text/Voice input & output, Regional language support
-```
-
-## User Flow
-
-1. **Intro Screen** → Language Selection
-2. **Registration** → Name, Location, Phone
-3. **Intro Screens** → Feature walkthrough (in selected language)
-4. **Home Screen** → Access to 4 main features + weather status
-5. Language can be changed anytime via settings icon
-
-## Getting Started
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/KisaanVerse.git
-
-# Navigate to project directory
-cd KisaanVerse
-
-# Install dependencies
-# (Add specific installation commands based on your setup)
-```
-
-## Development
-
-- **IDE**: VS Code
-- **Mobile Testing**: Android Emulator
-- **Flutter SDK**: Required
-- **Android SDK**: Required
-
-## Keywords
-
-`agriculture` `genai` `ml` `flutter` `regional-language` `crop-prediction` `weather-monitoring` `voice-assistant` `rag-system` `fastapi`
+1. Implement crop recommendation ML model in `services.py`
+2. Add yield prediction logic
+3. Integrate government schemes web scraping
+4. Connect GenAI/LLM for AI assistant
+5. Add database for user data
+6. Implement authentication
 
 ---
 
-**License**: MIT (or your preferred license)
-
-**Contributors**: Welcome! Please read our contributing guidelines before submitting PRs.
+**License**: MIT
