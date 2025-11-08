@@ -12,12 +12,13 @@ class WeatherResponse(BaseModel):
 
 # Crop Recommendation Models
 class CropRecommendationRequest(BaseModel):
-    state: str = Field(..., description="State name")
-    crop: Optional[str] = Field(None, description="Current/intended crop")
-    area: float = Field(..., description="Area in hectares")
-    fertilizer: Optional[str] = Field(None, description="Fertilizer type")
-    pesticide: Optional[str] = Field(None, description="Pesticide type")
-    season: str = Field(..., description="Season (Rabi, Kharif, Zaid)")
+    N: float = Field(..., description="Nitrogen content in soil")
+    P: float = Field(..., description="Phosphorus content in soil")
+    K: float = Field(..., description="Potassium content in soil")
+    temperature: float = Field(..., description="Temperature in Celsius")
+    humidity: float = Field(..., description="Humidity percentage")
+    ph: float = Field(..., description="Soil pH value")
+    rainfall: float = Field(..., description="Rainfall in mm")
 
 
 class CropStatus(BaseModel):

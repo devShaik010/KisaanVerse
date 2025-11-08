@@ -12,7 +12,7 @@ from app.models import (
     BotLLMRequest,
     BotLLMResponse
 )
-from app.services import get_weather_data, get_coordinates
+from app.services import get_weather_data, get_coordinates, recommend_crops
 
 router = APIRouter()
 
@@ -37,8 +37,25 @@ async def get_weather(
 
 @router.post("/kv/predictCrop", response_model=CropRecommendationResponse, tags=["Crop Recommendation"])
 async def predict_crop(request: CropRecommendationRequest):
-    """Crop recommendation"""
-    pass
+    """
+    Crop recommendation based on soil and climate parameters.
+    
+    Predicts the most suitable crops using a CatBoost ML model.
+    Returns top 3 recommended crops with confidence scores.
+    """
+    try:
+        result = await recommend_crops(
+            N=request.N,
+            P=request.P,
+            K=request.K,
+            temperature=request.temperature,
+            humidity=request.humidity,
+            ph=request.ph,
+            rainfall=request.rainfall
+        )
+        return CropRecommendationResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
 @router.post("/kv/yieldPredict", response_model=YieldPredictionResponse, tags=["Yield Prediction"])
