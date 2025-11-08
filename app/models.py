@@ -35,31 +35,24 @@ class CropRecommendationResponse(BaseModel):
 
 # Crop Yield Prediction Models
 class YieldPredictionRequest(BaseModel):
-    state: str
-    district: str
-    year: int
-    crop: str
-    season: str
-    sowing_date: str
-    duration_days: int
-    soil_oc_pct: float = Field(..., description="Soil organic carbon percentage")
-    soil_ph: float = Field(..., description="Soil pH value")
-    n_kg_ha: float = Field(..., description="Nitrogen in kg/ha")
-    p2o5_kg_ha: float = Field(..., description="Phosphorus in kg/ha")
-    k2o_kg_ha: float = Field(..., description="Potassium in kg/ha")
-    irrigation_mm: float = Field(..., description="Irrigation in mm")
-    rain_mm_season: float = Field(..., description="Seasonal rainfall in mm")
-    gdd_base10: float = Field(..., description="Growing degree days")
-    hot_days_gt35: int = Field(..., description="Days with temp > 35°C")
-    cold_days_lt10: int = Field(..., description="Days with temp < 10°C")
-    predict: str = Field(default="yield_kg_ha", description="Prediction type")
+    Area: float = Field(..., description="Area in hectares")
+    Annual_Rainfall: float = Field(..., description="Annual rainfall in mm")
+    Fertilizer: float = Field(..., description="Fertilizer amount in kg")
+    Pesticide: float = Field(..., description="Pesticide amount in kg")
+    Crop: str = Field(..., description="Crop name (e.g., Arecanut, Rice, Wheat)")
+    Season: str = Field(..., description="Season (Kharif, Rabi, Whole Year, Summer, Winter, Autumn)")
+    State: str = Field(..., description="State name (e.g., Assam, Punjab, Maharashtra)")
 
 
 class YieldPredictionResponse(BaseModel):
-    yield_kg_ha: float
-    predicted_yield_tons: float
-    confidence: float
-    factors: dict
+    predicted_yield: float = Field(..., description="Predicted yield in tons/hectare")
+    total_production: float = Field(..., description="Total production in tons (yield × area)")
+    area: float = Field(..., description="Cultivation area in hectares")
+    area_in_acres: float = Field(..., description="Cultivation area in acres")
+    crop: str
+    season: str
+    state: str
+    confidence_level: str = Field(..., description="High, Medium, or Low")
     recommendations: List[str]
 
 

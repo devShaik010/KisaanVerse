@@ -12,7 +12,7 @@ from app.models import (
     BotLLMRequest,
     BotLLMResponse
 )
-from app.services import get_weather_data, get_coordinates, recommend_crops
+from app.services import get_weather_data, get_coordinates, recommend_crops, predict_crop_yield
 
 router = APIRouter()
 
@@ -60,8 +60,25 @@ async def predict_crop(request: CropRecommendationRequest):
 
 @router.post("/kv/yieldPredict", response_model=YieldPredictionResponse, tags=["Yield Prediction"])
 async def predict_yield(request: YieldPredictionRequest):
-    """Yield prediction"""
-    pass
+    """
+    Crop yield prediction based on area, rainfall, fertilizer, pesticide, crop, season, and state.
+    
+    Predicts the expected yield in tons per hectare using a CatBoost ML model.
+    Returns predicted yield with confidence level and recommendations.
+    """
+    try:
+        result = await predict_crop_yield(
+            Area=request.Area,
+            Annual_Rainfall=request.Annual_Rainfall,
+            Fertilizer=request.Fertilizer,
+            Pesticide=request.Pesticide,
+            Crop=request.Crop,
+            Season=request.Season,
+            State=request.State
+        )
+        return YieldPredictionResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Yield prediction failed: {str(e)}")
 
 
 @router.get("/kv/govSchemes", response_model=GovSchemesResponse, tags=["Government Schemes"])

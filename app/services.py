@@ -6,52 +6,38 @@ from pathlib import Path
 
 
 # Load ML Models for Crop Recommendation
-MODEL_DIR = Path(__file__).parent / "models" / "Crop_predict"
+CROP_MODEL_DIR = Path(__file__).parent / "models" / "Crop_predict"
+YIELD_MODEL_DIR = Path(__file__).parent / "models" / "Yield_prediction"
+
 _crop_model = None
 _label_encoder = None
 _scaler = None
 
+_yield_model = None
+_yield_preprocessor = None
+_yield_metadata = None
+
 
 def load_crop_model():
-    """Load CatBoost crop recommendation model, scaler, and label encoder"""
+    """Load CatBoost crop recommendation model"""
     global _crop_model, _label_encoder, _scaler
     
     if _crop_model is None:
         try:
-            import json
+            print("🔄 Loading CatBoost crop recommendation model...")
             
-            # Load the CatBoost model from cbm file
-            print("🔄 Loading CatBoost model from cbm file...")
-            from catboost import CatBoostClassifier
-            model_path = MODEL_DIR / "catboost_crop_rec.cbm"
-            _crop_model = CatBoostClassifier()
-            _crop_model.load_model(str(model_path))
+            # Load the new pickle model
+            model_path = CROP_MODEL_DIR / "catboost_crop_recommendation_model.pkl"
+            with open(model_path, 'rb') as f:
+                _crop_model = pickle.load(f)
             
-            # Try to load scaler, but don't fail if it has issues
-            scaler_path = MODEL_DIR / "scaler.pkl"
-            if scaler_path.exists():
-                try:
-                    print("🔄 Attempting to load feature scaler...")
-                    with open(scaler_path, 'rb') as f:
-                        _scaler = pickle.load(f)
-                    print("✅ Feature scaler loaded")
-                except Exception as e:
-                    print(f"⚠️ Could not load scaler (pickle compatibility issue): {e}")
-                    print("⚠️ Continuing without scaler - model should work without it")
-                    _scaler = None
-            else:
-                print("⚠️ No scaler found, using raw features")
-                _scaler = None
-            
-            # Load metadata to get crop classes
-            metadata_path = MODEL_DIR / "metadata.json"
-            with open(metadata_path, 'r') as f:
-                metadata = json.load(f)
-                _label_encoder = metadata['classes']
+            # Get classes directly from the model
+            _label_encoder = _crop_model.classes_
+            _scaler = None  # Not needed with the new model
                 
             print(f"✅ Crop recommendation model loaded successfully")
-            print(f"✅ Model accuracy: {metadata.get('test_accuracy', 'N/A')}")
             print(f"✅ Number of crops: {len(_label_encoder)}")
+            print(f"✅ Crops: {list(_label_encoder)}")
             
         except Exception as e:
             print(f"❌ Error loading crop model: {e}")
@@ -60,6 +46,37 @@ def load_crop_model():
             raise
     
     return _crop_model, _label_encoder, _scaler
+
+
+def load_yield_model():
+    """Load CatBoost yield prediction model"""
+    global _yield_model, _yield_preprocessor, _yield_metadata
+    
+    if _yield_model is None:
+        try:
+            print("🔄 Loading CatBoost yield prediction model...")
+            
+            # Load the CatBoost model from cbm file
+            from catboost import CatBoostRegressor
+            model_path = YIELD_MODEL_DIR / "catboost_crop_yield_model.cbm"
+            _yield_model = CatBoostRegressor()
+            _yield_model.load_model(str(model_path))
+            
+            # Store feature names from the model
+            _yield_metadata = {
+                'feature_names': _yield_model.feature_names_
+            }
+            
+            print(f"✅ Yield prediction model loaded successfully")
+            print(f"✅ Number of features: {len(_yield_model.feature_names_)}")
+            
+        except Exception as e:
+            print(f"❌ Error loading yield model: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+    
+    return _yield_model, None, _yield_metadata
 
 
 # Weather Service
@@ -131,21 +148,25 @@ async def recommend_crops(N: float, P: float, K: float, temperature: float,
     """
     try:
         import numpy as np
+        import pandas as pd
         
-        # Load model and scaler
+        # Load model
         model, crop_classes, scaler = load_crop_model()
         
-        # Prepare input data (order must match training: N, P, K, temperature, humidity, ph, rainfall)
-        input_data = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
-        
-        # Apply scaling if scaler exists
-        if scaler is not None:
-            print(f"🔍 Scaling input features...")
-            input_data = scaler.transform(input_data)
+        # Prepare input data as DataFrame (matching training format)
+        input_data = pd.DataFrame({
+            'N': [N],
+            'P': [P],
+            'K': [K],
+            'temperature': [temperature],
+            'humidity': [humidity],
+            'ph': [ph],
+            'rainfall': [rainfall]
+        })
         
         # Debug: Print input data
         print(f"🔍 Input data: N={N}, P={P}, K={K}, temp={temperature}, humidity={humidity}, ph={ph}, rain={rainfall}")
-        print(f"🔍 Input array shape: {input_data.shape}")
+        print(f"🔍 Input DataFrame shape: {input_data.shape}")
         
         # Get prediction probabilities
         probabilities = model.predict_proba(input_data)[0]
@@ -157,13 +178,12 @@ async def recommend_crops(N: float, P: float, K: float, temperature: float,
         # Check if model is broken (all predictions same)
         if np.std(probabilities) < 0.01:
             print("⚠️ WARNING: Model appears broken (all probabilities similar)")
-            print("⚠️ Using rule-based fallback system")
-            return _rule_based_recommendation(N, P, K, temperature, humidity, ph, rainfall)
+            raise RuntimeError("Model is not responding to input variations. Please retrain the model.")
         
         # Get all crop predictions with probabilities
         crop_predictions = []
         for idx, prob in enumerate(probabilities):
-            crop_name = crop_classes[idx]  # Use classes list directly
+            crop_name = crop_classes[idx]
             crop_predictions.append({
                 'crop': crop_name,
                 'probability': float(prob)
@@ -224,9 +244,138 @@ async def recommend_crops(N: float, P: float, K: float, temperature: float,
 
 
 # Yield Prediction Service
-async def predict_crop_yield(request_data: dict):
-    """Implement ML model for yield prediction"""
-    raise NotImplementedError("Yield prediction service not implemented yet")
+async def predict_crop_yield(Area: float, Annual_Rainfall: float, Fertilizer: float,
+                            Pesticide: float, Crop: str, Season: str, State: str) -> Dict:
+    """
+    Predict crop yield using CatBoost model with one-hot encoding.
+    
+    Args:
+        Area: Area in hectares
+        Annual_Rainfall: Annual rainfall in mm
+        Fertilizer: Fertilizer amount in kg
+        Pesticide: Pesticide amount in kg
+        Crop: Crop name
+        Season: Season name
+        State: State name
+    
+    Returns:
+        Dictionary with predicted yield and recommendations
+    """
+    try:
+        import pandas as pd
+        import numpy as np
+        
+        # Load model
+        model, _, metadata = load_yield_model()
+        
+        # Get all feature names from the model
+        all_features = metadata['feature_names']
+        
+        # Create base input with numeric features
+        test_input_data = {
+            'Area': [Area],
+            'Annual_Rainfall': [Annual_Rainfall],
+            'Fertilizer': [Fertilizer],
+            'Pesticide': [Pesticide]
+        }
+        
+        # Initialize all encoded columns with 0
+        for col in all_features:
+            if col not in test_input_data:
+                test_input_data[col] = 0
+        
+        # Set the one-hot encoded columns for Crop, Season, State
+        crop_col = f'Crop_{Crop}'
+        season_col = f'Season_{Season}'
+        state_col = f'State_{State}'
+        
+        if crop_col in all_features:
+            test_input_data[crop_col] = 1
+        if season_col in all_features:
+            test_input_data[season_col] = 1
+        if state_col in all_features:
+            test_input_data[state_col] = 1
+        
+        # Create DataFrame and ensure column order matches training
+        test_input = pd.DataFrame(test_input_data)
+        test_input = test_input[all_features]
+        
+        print(f"🔍 Yield Input: Area={Area}, Rainfall={Annual_Rainfall}mm, Crop={Crop}, Season={Season}, State={State}")
+        print(f"🔍 Input shape: {test_input.shape}")
+        
+        # Predict
+        predicted_yield = model.predict(test_input)[0]
+        
+        print(f"🔍 Predicted yield: {predicted_yield:.4f} tons/hectare")
+        
+        # Calculate total production
+        total_production = predicted_yield * Area
+        area_in_acres = Area * 2.47105  # Convert hectares to acres
+        
+        print(f"🔍 Total production: {total_production:.2f} tons")
+        print(f"🔍 Area: {Area} hectares ({area_in_acres:.2f} acres)")
+        
+        # Determine confidence level
+        if predicted_yield > 0.5:
+            confidence = "High"
+        elif predicted_yield > 0.1:
+            confidence = "Medium"
+        else:
+            confidence = "Low"
+        
+        # Generate recommendations
+        recommendations = []
+        
+        # Area-based recommendations
+        if Area < 1:
+            recommendations.append(f"Small plot of {area_in_acres:.2f} acres. Ideal for intensive farming and high-value crops.")
+        elif Area < 5:
+            recommendations.append(f"Medium-sized farm of {area_in_acres:.2f} acres. Good for diversified cropping.")
+        elif Area < 20:
+            recommendations.append(f"Large farm of {area_in_acres:.2f} acres. Consider mechanization for efficiency.")
+        else:
+            recommendations.append(f"Very large farm of {area_in_acres:.2f} acres. Mechanization highly recommended.")
+        
+        # Production-based recommendations
+        if total_production < 10:
+            recommendations.append(f"Expected total production: {total_production:.2f} tons. Consider value addition for better returns.")
+        elif total_production < 100:
+            recommendations.append(f"Expected total production: {total_production:.2f} tons. Plan storage and marketing strategies.")
+        else:
+            recommendations.append(f"Expected total production: {total_production:.2f} tons. Commercial-scale production - ensure supply chain management.")
+        
+        # Yield-based recommendations
+        if predicted_yield < 1.0:
+            recommendations.append(f"Predicted yield is relatively low. Consider optimizing fertilizer application.")
+            recommendations.append(f"Ensure adequate irrigation based on rainfall of {Annual_Rainfall}mm.")
+        elif predicted_yield > 5.0:
+            recommendations.append(f"Excellent yield potential! Maintain current farming practices.")
+            recommendations.append(f"Monitor for pests and diseases to protect high-value crops.")
+        else:
+            recommendations.append(f"Expected yield is within normal range for {Crop}.")
+        
+        # Rainfall-based recommendations
+        if Annual_Rainfall < 500:
+            recommendations.append("Low rainfall detected. Plan for supplemental irrigation systems.")
+        elif Annual_Rainfall > 2000:
+            recommendations.append("High rainfall area. Ensure proper drainage to prevent waterlogging.")
+        else:
+            recommendations.append(f"Moderate rainfall of {Annual_Rainfall}mm. Suitable for {Crop} cultivation.")
+        
+        return {
+            'predicted_yield': round(predicted_yield, 4),
+            'total_production': round(total_production, 2),
+            'area': Area,
+            'area_in_acres': round(area_in_acres, 2),
+            'crop': Crop,
+            'season': Season,
+            'state': State,
+            'confidence_level': confidence,
+            'recommendations': recommendations
+        }
+        
+    except Exception as e:
+        raise RuntimeError(f"Error in yield prediction: {str(e)}")
 
 
 # Government Schemes Service
